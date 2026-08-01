@@ -23,7 +23,7 @@ object ChatPoller {
     private var lastSent: String? = null
     private var lastSendMs = 0L
 
-    private const val THROTTLE_MS = 250L
+    private const val THROTTLE_MS = 150L
 
     fun tick(mc: Minecraft) {
         val screen = mc.screen
@@ -52,7 +52,11 @@ object ChatPoller {
     }
 
     private fun send(kind: Int, text: String) {
-        if (!canSend()) return
+        if (!canSend()) {
+            gg.earu.coh.Coh.LOGGER.debug("ChatPoller: cannot send (channel absent)")
+            return
+        }
+        gg.earu.coh.Coh.LOGGER.debug("ChatPoller: send kind={} len={}", kind, text.length)
         sendPayload(TypingPayload(kind, text))
     }
 }

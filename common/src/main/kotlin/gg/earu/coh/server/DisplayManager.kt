@@ -6,6 +6,7 @@ import gg.earu.coh.core.DisplaySink
 import gg.earu.coh.core.FollowMode
 import gg.earu.coh.core.ServerConfig
 import gg.earu.coh.mixin.DisplayInvoker
+import gg.earu.coh.mixin.EntityAccessor
 import gg.earu.coh.mixin.TextDisplayInvoker
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
@@ -43,8 +44,17 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
     override fun spawn(playerId: UUID, text: String) {
         remove(playerId)
-        val player = server?.playerList?.getPlayer(playerId) ?: return
-        val entity = createFor(player, text) ?: return
+        val player = server?.playerList?.getPlayer(playerId)
+        if (player == null) {
+            Coh.LOGGER.debug("spawn: no server attached or player {} offline (server={})", playerId, server != null)
+            return
+        }
+        val entity = createFor(player, text)
+        if (entity == null) {
+            Coh.LOGGER.debug("spawn: createFor failed for {}", player.scoreboardName)
+            return
+        }
+        Coh.LOGGER.debug("spawn: display {} riding {}", entity.id, player.scoreboardName)
         tracked[playerId] = Tracked(entity, text)
     }
 
@@ -141,14 +151,27 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         textDisplay.`coh$setBackgroundColor`(BACKGROUND)
         textDisplay.`coh$setText`(renderText(text))
 
-        if (!level.addFreshEntity(entity)) return null
-        // force=true, emitEvent=false: don't fire ENTITY_MOUNT game events (sculk!) for a hologram.
-        if (config.followMode == FollowMode.RIDE && !entity.startRiding(player, true, false)) {
-            // Riding refused (another mod interfering) — bail rather than churn; TELEPORT mode is the escape hatch.
+        if (!level.addFreshEntity(entity)) {
+            Coh.LOGGER.debug("createFor: addFreshEntity refused")
+            return null
+        }
+        if (config.followMode == FollowMode.RIDE && !forceMount(entity, player)) {
+            Coh.LOGGER.debug("createFor: mount failed")
             entity.discard()
             return null
         }
         return entity
+    }
+
+    /**
+     * Vanilla startRiding refuses players as vehicles (EntityType.PLAYER doesn't serialize),
+     * so mount manually: the exact vanilla sequence minus its checks. No game event is fired
+     * (no sculk triggers) and the passenger packet syncs automatically via ServerEntity.
+     */
+    private fun forceMount(passenger: Display.TextDisplay, vehicle: ServerPlayer): Boolean {
+        (passenger as EntityAccessor).`coh$setVehicle`(vehicle)
+        (vehicle as EntityAccessor).`coh$addPassenger`(passenger)
+        return passenger.vehicle === vehicle
     }
 
     private fun renderText(text: String): Component =

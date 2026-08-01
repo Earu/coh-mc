@@ -49,7 +49,7 @@ chat reports are not involved), but you should know it happens. Escape hatches:
 |----------------------|---------|-------------------------------------------------------------|
 | `enabled`            | `true`  | Master switch                                               |
 | `viewRange`          | `0.5`   | text_display view range (~32 blocks at default client view) |
-| `throttleMs`         | `300`   | Server-side rate limit between typing updates               |
+| `throttleMs`         | `150`   | Server-side rate limit between typing updates               |
 | `popupSeconds`       | `6.0`   | How long sent messages linger                               |
 | `idleTimeoutSeconds` | `15.0`  | Kill typing bubbles that stop updating                      |
 | `maxChars`           | `256`   | Length clamp                                                |
