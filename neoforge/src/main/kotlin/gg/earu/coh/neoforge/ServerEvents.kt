@@ -2,12 +2,12 @@ package gg.earu.coh.neoforge
 
 import gg.earu.coh.server.CohServer
 import net.minecraft.server.level.ServerPlayer
-import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.event.ServerChatEvent
-import net.neoforged.neoforge.event.entity.player.PlayerEvent
-import net.neoforged.neoforge.event.server.ServerStartedEvent
-import net.neoforged.neoforge.event.server.ServerStoppingEvent
-import net.neoforged.neoforge.event.tick.ServerTickEvent
+import net.minecraftforge.event.ServerChatEvent
+import net.minecraftforge.event.TickEvent
+import net.minecraftforge.event.entity.player.PlayerEvent
+import net.minecraftforge.event.server.ServerStartedEvent
+import net.minecraftforge.event.server.ServerStoppingEvent
+import net.minecraftforge.eventbus.api.SubscribeEvent
 
 object ServerEvents {
     @SubscribeEvent
@@ -16,8 +16,8 @@ object ServerEvents {
     }
 
     @SubscribeEvent
-    fun onServerTick(@Suppress("UNUSED_PARAMETER") event: ServerTickEvent.Post) {
-        CohServer.onTick()
+    fun onServerTick(event: TickEvent.ServerTickEvent) {
+        if (event.phase == TickEvent.Phase.END) CohServer.onTick()
     }
 
     @SubscribeEvent

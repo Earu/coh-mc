@@ -3,26 +3,23 @@ package gg.earu.coh.neoforge
 import gg.earu.coh.Coh
 import gg.earu.coh.client.ChatPoller
 import gg.earu.coh.core.CohConfig
-import gg.earu.coh.net.CohPayloads
 import net.minecraft.client.Minecraft
-import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket
-import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.client.event.ClientTickEvent
+import net.minecraftforge.event.TickEvent
+import net.minecraftforge.eventbus.api.SubscribeEvent
 
 /** Only loaded on the client dist. */
 object ClientEvents {
     fun wire() {
         ChatPoller.config = CohConfig.loadClient(Coh.platform.configDir)
         ChatPoller.canSend = {
-            Minecraft.getInstance().connection?.hasChannel(CohPayloads.TypingPayload.TYPE) == true
+            val connection = Minecraft.getInstance().connection
+            connection != null && Payloads.channel.isRemotePresent(connection.connection)
         }
-        ChatPoller.sendPayload = { payload ->
-            Minecraft.getInstance().connection?.send(ServerboundCustomPayloadPacket(payload))
-        }
+        ChatPoller.sendPayload = { Payloads.channel.sendToServer(it) }
     }
 
     @SubscribeEvent
-    fun onClientTick(@Suppress("UNUSED_PARAMETER") event: ClientTickEvent.Post) {
-        ChatPoller.tick(Minecraft.getInstance())
+    fun onClientTick(event: TickEvent.ClientTickEvent) {
+        if (event.phase == TickEvent.Phase.END) ChatPoller.tick(Minecraft.getInstance())
     }
 }

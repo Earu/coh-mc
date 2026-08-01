@@ -1,49 +1,31 @@
 package gg.earu.coh.neoforge
 
 import gg.earu.coh.Coh
-import gg.earu.coh.net.CohPayloads
 import gg.earu.coh.server.CohServer
-import net.minecraft.server.level.ServerPlayer
-import net.neoforged.bus.api.IEventBus
-import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.fml.ModContainer
-import net.neoforged.fml.common.Mod
-import net.neoforged.fml.loading.FMLEnvironment
-import net.neoforged.fml.loading.FMLPaths
-import net.neoforged.neoforge.common.NeoForge
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
+import net.minecraftforge.common.MinecraftForge
+import net.minecraftforge.fml.ModList
+import net.minecraftforge.fml.common.Mod
+import net.minecraftforge.fml.loading.FMLEnvironment
+import net.minecraftforge.fml.loading.FMLPaths
 
 @Mod(Coh.MOD_ID)
-class CohNeoForge(container: ModContainer, modBus: IEventBus) {
+class CohNeoForge {
     init {
         Coh.init(
             NeoForgePlatform(
                 configDir = FMLPaths.CONFIGDIR.get().resolve(Coh.MOD_ID),
                 isClient = FMLEnvironment.dist.isClient,
-                modVersion = container.modInfo.version.toString(),
+                modVersion = ModList.get().getModContainerById(Coh.MOD_ID)
+                    .map { it.modInfo.version.toString() }.orElse("dev"),
             )
         )
         CohServer.init(Coh.platform)
 
-        modBus.register(ModBusEvents)
-        NeoForge.EVENT_BUS.register(ServerEvents)
+        Payloads.register()
+        MinecraftForge.EVENT_BUS.register(ServerEvents)
         if (FMLEnvironment.dist.isClient) {
             ClientEvents.wire()
-            NeoForge.EVENT_BUS.register(ClientEvents)
-        }
-    }
-
-    object ModBusEvents {
-        @SubscribeEvent
-        fun onRegisterPayloads(event: RegisterPayloadHandlersEvent) {
-            // Optional channel: vanilla clients connect untouched, viewers never need the mod.
-            event.registrar("1").optional().playToServer(
-                CohPayloads.TypingPayload.TYPE,
-                CohPayloads.TypingPayload.CODEC,
-            ) { payload, context ->
-                val player = context.player() as? ServerPlayer ?: return@playToServer
-                context.enqueueWork { CohServer.onTyping(player, payload) }
-            }
+            MinecraftForge.EVENT_BUS.register(ClientEvents)
         }
     }
 }

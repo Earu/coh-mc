@@ -9,11 +9,16 @@ import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.resources.ResourceLocation
 import java.nio.file.Path
+
+/** Channel id for the 1.20.1 raw-channel networking (pre-payload-types API). */
+object FabricChannel {
+    val TYPING = ResourceLocation(Coh.MOD_ID, CohPayloads.TYPING_PATH)
+}
 
 class CohFabric : ModInitializer {
     class FabricPlatform : Platform {
@@ -27,10 +32,11 @@ class CohFabric : ModInitializer {
         Coh.init(FabricPlatform())
         CohServer.init(Coh.platform)
 
-        PayloadTypeRegistry.playC2S().register(CohPayloads.TypingPayload.TYPE, CohPayloads.TypingPayload.CODEC)
-
-        ServerPlayNetworking.registerGlobalReceiver(CohPayloads.TypingPayload.TYPE) { payload, context ->
-            context.server().execute { CohServer.onTyping(context.player(), payload) }
+        ServerPlayNetworking.registerGlobalReceiver(FabricChannel.TYPING) { server, player, _, buf, _ ->
+            val kind = buf.readVarInt()
+            val text = buf.readUtf(CohPayloads.MAX_TEXT)
+            // Raw-channel handlers run on netty threads; hop to the server thread.
+            server.execute { CohServer.onTyping(player, CohPayloads.TypingPayload(kind, text)) }
         }
 
         ServerMessageEvents.CHAT_MESSAGE.register { message, sender, _ ->
