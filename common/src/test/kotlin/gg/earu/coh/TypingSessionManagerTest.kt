@@ -50,13 +50,15 @@ class TypingSessionManagerTest {
     }
 
     @Test
-    fun `rate limit drops rapid updates`() {
-        val (m, sink) = manager() // 300 ms = 6 ticks
+    fun `rate limited updates queue and flush on tick`() {
+        val (m, sink) = manager() // 150 ms = 3 ticks
         m.onStart(id, 0)
         m.onText(id, "a", 10)
-        m.onText(id, "ab", 12) // within 6 ticks of previous accept -> dropped
         assertEquals("update:a", sink.last())
-        m.onText(id, "abc", 16)
+        m.onText(id, "ab", 11) // inside the window -> queued, not shown yet
+        m.onText(id, "abc", 12) // newer text replaces the queued one
+        assertEquals("update:a", sink.last())
+        m.onTick(13) // gate opens -> newest text flushes
         assertEquals("update:abc", sink.last())
     }
 

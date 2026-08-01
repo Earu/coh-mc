@@ -19,8 +19,8 @@ data class ServerConfig(
     val enabled: Boolean = true,
     /** text_display view range multiplier; 0.5 ≈ 32 blocks at default client entity distance. */
     val viewRange: Float = 0.5f,
-    /** Minimum interval between accepted text updates per player. */
-    val throttleMs: Int = 300,
+    /** Minimum interval between accepted text updates per player; late updates queue, never drop. */
+    val throttleMs: Int = 150,
     /** How long a sent chat message lingers above the head. */
     val popupSeconds: Double = 6.0,
     /** Typing sessions with no updates for this long are force-ended. */
