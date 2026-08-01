@@ -1,0 +1,28 @@
+modLoader = "kotlinforforge"
+loaderVersion = "[5,)"
+license = "AGPL-3.0"
+issueTrackerURL = "https://github.com/Earu/coh-mc/issues"
+
+[[mods]]
+modId = "coh"
+version = "${version}"
+displayName = "Chat Over Head"
+description = '''See what players are typing above their heads, in real time. Viewers don't need the mod.'''
+authors = "Earu"
+
+[[mixins]]
+config = "coh.mixins.json"
+
+[[dependencies.coh]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.11.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.coh]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.11]"
+ordering = "NONE"
+side = "BOTH"

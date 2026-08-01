@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "coh",
+  "version": "${version}",
+  "name": "Chat Over Head",
+  "description": "See what players are typing above their heads, in real time. Viewers don't need the mod.",
+  "authors": ["Earu"],
+  "contact": {
+    "issues": "https://github.com/Earu/coh-mc/issues",
+    "sources": "https://github.com/Earu/coh-mc"
+  },
+  "license": "AGPL-3.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      {
+        "adapter": "kotlin",
+        "value": "gg.earu.coh.fabric.CohFabric"
+      }
+    ],
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "gg.earu.coh.fabric.CohFabricClient"
+      }
+    ]
+  },
+  "mixins": ["coh.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.13.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
