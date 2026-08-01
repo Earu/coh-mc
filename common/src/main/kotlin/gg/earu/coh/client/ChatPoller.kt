@@ -42,7 +42,8 @@ object ChatPoller {
 
         val raw = screen.children().filterIsInstance<EditBox>().firstOrNull()?.value ?: return
         // Concealed text is replaced by "" (server shows just the typing indicator), matching GMod.
-        val effective = if (TextSanitizer.shouldConceal(raw)) "" else raw
+        // Clamped to the wire cap: mods like chatsounds raise the chat box limit past vanilla's 256.
+        val effective = if (TextSanitizer.shouldConceal(raw)) "" else raw.take(CohPayloads.MAX_TEXT)
         val now = System.currentTimeMillis()
         if (effective != lastSent && now - lastSendMs >= THROTTLE_MS) {
             lastSent = effective

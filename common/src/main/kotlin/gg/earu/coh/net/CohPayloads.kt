@@ -13,6 +13,9 @@ import net.minecraft.resources.ResourceLocation
  * C->S only; there is no S->C traffic at all.
  */
 object CohPayloads {
+    /** Wire cap. Other mods (chatsounds) raise the chat box limit far beyond vanilla's 256. */
+    const val MAX_TEXT = 512
+
     const val KIND_START = 0
     const val KIND_TEXT = 1
     const val KIND_END = 2
@@ -23,7 +26,7 @@ object CohPayloads {
             val TYPE = CustomPacketPayload.Type<TypingPayload>(ResourceLocation.fromNamespaceAndPath(Coh.MOD_ID, "typing"))
             val CODEC: StreamCodec<ByteBuf, TypingPayload> = StreamCodec.composite(
                 ByteBufCodecs.VAR_INT, TypingPayload::kind,
-                ByteBufCodecs.stringUtf8(512), TypingPayload::text,
+                ByteBufCodecs.stringUtf8(MAX_TEXT), TypingPayload::text,
                 ::TypingPayload,
             )
         }
