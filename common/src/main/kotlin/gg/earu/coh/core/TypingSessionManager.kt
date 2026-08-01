@@ -30,6 +30,9 @@ class TypingSessionManager(
         var text: String = ""
         var popupStartTick: Long = 0
         var displayed: Boolean = false
+
+        /** Newest text that arrived inside the rate window; flushed by onTick when the gate opens. */
+        var pendingText: String? = null
     }
 
     private val sessions = HashMap<UUID, Session>()
@@ -51,13 +54,24 @@ class TypingSessionManager(
         if (!config.enabled) return
         val session = sessions[id] ?: return
         if (session.phase != Phase.TYPING) return
-        val throttleTicks = (config.throttleMs / 50L).coerceAtLeast(1)
-        if (!limiter.tryAcquire(id, nowTick, throttleTicks)) return
 
         val sanitized = TextSanitizer.sanitize(raw, config.maxChars)
         // Concealment is enforced client-side too; this guards against modified clients.
         val effective = if (TextSanitizer.shouldConceal(sanitized)) "" else sanitized
         session.lastActivityTick = nowTick
+
+        // Rate-limited updates are queued, not dropped — the display always converges to the latest text.
+        if (!limiter.tryAcquire(id, nowTick, throttleTicks())) {
+            session.pendingText = effective
+            return
+        }
+        applyText(id, session, effective)
+    }
+
+    private fun throttleTicks() = (config.throttleMs / 50L).coerceAtLeast(1)
+
+    private fun applyText(id: UUID, session: Session, effective: String) {
+        session.pendingText = null
         if (effective == session.text && session.displayed) return
         session.text = effective
         render(id, session)
@@ -96,10 +110,16 @@ class TypingSessionManager(
         while (iterator.hasNext()) {
             val (id, session) = iterator.next()
             when (session.phase) {
-                Phase.TYPING -> if (nowTick - session.lastActivityTick > idleTicks) {
-                    if (session.displayed) sink.remove(id)
-                    limiter.forget(id)
-                    iterator.remove()
+                Phase.TYPING -> {
+                    val pending = session.pendingText
+                    if (pending != null && limiter.tryAcquire(id, nowTick, throttleTicks())) {
+                        applyText(id, session, pending)
+                    }
+                    if (nowTick - session.lastActivityTick > idleTicks) {
+                        if (session.displayed) sink.remove(id)
+                        limiter.forget(id)
+                        iterator.remove()
+                    }
                 }
 
                 Phase.POPUP -> {

@@ -35,6 +35,7 @@ object CohServer {
 
     /** Must be called on the server thread. */
     fun onTyping(player: ServerPlayer, payload: CohPayloads.TypingPayload) {
+        gg.earu.coh.Coh.LOGGER.debug("onTyping {} kind={} len={}", player.scoreboardName, payload.kind, payload.text.length)
         when (payload.kind) {
             CohPayloads.KIND_START -> sessions.onStart(player.uuid, tick)
             CohPayloads.KIND_TEXT -> sessions.onText(player.uuid, payload.text, tick)
