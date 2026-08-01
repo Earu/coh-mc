@@ -1,10 +1,10 @@
 # Chat Over Head (COH)
 
-Minecraft port of the GMod rtchat/coh addon. What a player is typing shows above their
-head in real time, and sent messages linger there for a few seconds.
+Shows what a player is typing above their head in real time and sticks around for a few
+seconds when the message is sent.
 
-Rendering is server-side with vanilla `text_display` entities, so viewers don't need the
-mod. Install it on the server, and on the client of anyone who wants their typing shared.
+Rendering is server-side with vanilla `text_display` entities. Install only needs to be
+serverside for rendering, for typing in real time you need the client install too.
 
 ## Branches
 
