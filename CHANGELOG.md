@@ -1,0 +1,3 @@
+- Initial release: live typing bubbles and sent-message popups above players' heads
+- Server-side rendering with vanilla text_display, viewers don't need the mod
+- Hide prefixes (`-- hide`, `// hide`, `# hide`), commands never transmitted, client toggle
