@@ -13,7 +13,6 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Display
-import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityType
 import org.joml.Vector3f
 import java.util.UUID
@@ -125,7 +124,7 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
     private fun createFor(player: ServerPlayer, text: String): Display.TextDisplay? {
         val level = player.level() as? ServerLevel ?: return null
-        val entity = EntityType.TEXT_DISPLAY.create(level, EntitySpawnReason.TRIGGERED) ?: return null
+        val entity = EntityType.TEXT_DISPLAY.create(level) ?: return null
         entity.addTag(ORPHAN_TAG)
         entity.setPos(player.x, player.eyeY + 0.3, player.z)
 
@@ -142,8 +141,7 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         textDisplay.`coh$setText`(renderText(text))
 
         if (!level.addFreshEntity(entity)) return null
-        // force=true, emitEvent=false: don't fire ENTITY_MOUNT game events (sculk!) for a hologram.
-        if (config.followMode == FollowMode.RIDE && !entity.startRiding(player, true, false)) {
+        if (config.followMode == FollowMode.RIDE && !entity.startRiding(player, true)) {
             // Riding refused (another mod interfering) — bail rather than churn; TELEPORT mode is the escape hatch.
             entity.discard()
             return null

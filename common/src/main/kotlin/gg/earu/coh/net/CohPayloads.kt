@@ -5,7 +5,7 @@ import io.netty.buffer.ByteBuf
 import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
-import net.minecraft.resources.Identifier
+import net.minecraft.resources.ResourceLocation
 
 /**
  * Wire format shared by every loader. The channel is OPTIONAL: vanilla clients/servers
@@ -20,7 +20,7 @@ object CohPayloads {
     /** C->S: live typing state. Full string every time (MC chat is ≤256 chars, no diffing needed). */
     class TypingPayload(val kind: Int, val text: String) : CustomPacketPayload {
         companion object {
-            val TYPE = CustomPacketPayload.Type<TypingPayload>(Identifier.fromNamespaceAndPath(Coh.MOD_ID, "typing"))
+            val TYPE = CustomPacketPayload.Type<TypingPayload>(ResourceLocation.fromNamespaceAndPath(Coh.MOD_ID, "typing"))
             val CODEC: StreamCodec<ByteBuf, TypingPayload> = StreamCodec.composite(
                 ByteBufCodecs.VAR_INT, TypingPayload::kind,
                 ByteBufCodecs.stringUtf8(512), TypingPayload::text,

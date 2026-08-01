@@ -19,7 +19,7 @@ class CohNeoForge(container: ModContainer, modBus: IEventBus) {
         Coh.init(
             NeoForgePlatform(
                 configDir = FMLPaths.CONFIGDIR.get().resolve(Coh.MOD_ID),
-                isClient = FMLEnvironment.getDist().isClient,
+                isClient = FMLEnvironment.dist.isClient,
                 modVersion = container.modInfo.version.toString(),
             )
         )
@@ -27,7 +27,7 @@ class CohNeoForge(container: ModContainer, modBus: IEventBus) {
 
         modBus.register(ModBusEvents)
         NeoForge.EVENT_BUS.register(ServerEvents)
-        if (FMLEnvironment.getDist().isClient) {
+        if (FMLEnvironment.dist.isClient) {
             ClientEvents.wire()
             NeoForge.EVENT_BUS.register(ClientEvents)
         }

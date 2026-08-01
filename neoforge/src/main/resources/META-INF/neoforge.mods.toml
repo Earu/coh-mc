@@ -16,13 +16,13 @@ config = "coh.mixins.json"
 [[dependencies.coh]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21.11.0,)"
+versionRange = "[21.1.0,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.coh]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.11]"
+versionRange = "[1.21.1]"
 ordering = "NONE"
 side = "BOTH"
