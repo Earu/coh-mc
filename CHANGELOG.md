@@ -1,1 +1,3 @@
+- Fixed the bubble staying behind on your own screen while typing (moving, falling or getting pushed left it floating where you started); it now follows you like it already did for everyone else
+- Sent messages now stay at the spot you sent them from instead of trailing you around
 - Fixed a client kick (`String too big`) when typing messages longer than 512 chars, possible with mods that raise the chat box limit (e.g. chatsounds)

@@ -12,6 +12,9 @@ interface DisplaySink {
     /** progress 0..1 across the fade window at the end of a popup's life. */
     fun fade(playerId: UUID, progress: Float)
 
+    /** Stop following the player: the display stays where it is for the rest of its life. */
+    fun freeze(playerId: UUID)
+
     fun remove(playerId: UUID)
 }
 
@@ -93,11 +96,18 @@ class TypingSessionManager(
             return
         }
         val session = sessions.getOrPut(id) { Session(Phase.POPUP, nowTick) }
+        // A popup left over from the previous message sits wherever that one was sent; the new
+        // message belongs above the player, so start over rather than retexting a stale display.
+        if (session.phase == Phase.POPUP && session.displayed) {
+            sink.remove(id)
+            session.displayed = false
+        }
         session.phase = Phase.POPUP
         session.text = sanitized
         session.popupStartTick = nowTick
         session.lastActivityTick = nowTick
         render(id, session)
+        sink.freeze(id)
     }
 
     fun onTick(nowTick: Long) {
