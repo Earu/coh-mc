@@ -13,6 +13,7 @@ class FakeSink : DisplaySink {
     override fun spawn(playerId: UUID, text: String) { calls += "spawn:$text" }
     override fun update(playerId: UUID, text: String) { calls += "update:$text" }
     override fun fade(playerId: UUID, progress: Float) { calls += "fade" }
+    override fun freeze(playerId: UUID) { calls += "freeze" }
     override fun remove(playerId: UUID) { calls += "remove" }
     fun last() = calls.lastOrNull()
 }
@@ -96,7 +97,7 @@ class TypingSessionManagerTest {
     fun `popup expires after lifetime with fade near the end`() {
         val (m, sink) = manager() // 6 s = 120 ticks
         m.onChat(id, "gg", 0) // vanilla typist: popup without prior session
-        assertEquals("spawn:gg", sink.last())
+        assertEquals(listOf("spawn:gg", "freeze"), sink.calls)
         m.onTick(100)
         assertTrue(sink.calls.none { it == "fade" })
         m.onTick(110) // inside the 14-tick fade window
@@ -104,6 +105,24 @@ class TypingSessionManagerTest {
         m.onTick(120)
         assertEquals("remove", sink.last())
         assertTrue(m.activeIds.isEmpty())
+    }
+
+    @Test
+    fun `sending freezes the popup where it was sent`() {
+        val (m, sink) = manager()
+        m.onStart(id, 0)
+        m.onText(id, "hell", 10)
+        m.onChat(id, "hello", 20)
+        assertEquals(listOf("spawn:", "update:hell", "update:hello", "freeze"), sink.calls)
+    }
+
+    @Test
+    fun `a second message starts a new popup instead of retexting the frozen one`() {
+        val (m, sink) = manager()
+        m.onChat(id, "one", 0)
+        sink.calls.clear()
+        m.onChat(id, "two", 40)
+        assertEquals(listOf("remove", "spawn:two", "freeze"), sink.calls)
     }
 
     @Test

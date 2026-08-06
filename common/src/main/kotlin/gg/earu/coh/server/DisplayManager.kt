@@ -1,5 +1,6 @@
 package gg.earu.coh.server
 
+import com.google.common.collect.ImmutableList
 import com.mojang.math.Transformation
 import gg.earu.coh.Coh
 import gg.earu.coh.core.DisplaySink
@@ -10,6 +11,7 @@ import gg.earu.coh.mixin.EntityAccessor
 import gg.earu.coh.mixin.TextDisplayInvoker
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
@@ -26,6 +28,12 @@ import java.util.UUID
 class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySink {
     private class Tracked(var entity: Display.TextDisplay, var text: String) {
         var hidden = false
+
+        /** Cleared when the message is sent: the popup then stays where the player sent it. */
+        var following = true
+
+        /** Ticks left to (re)send the mount to the ridden player's own client, see [DisplayManager.syncMountToRider]. */
+        var mountSyncTicks = MOUNT_SYNC_TICKS
     }
 
     private var server: MinecraftServer? = null
@@ -76,6 +84,15 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         invoker.`coh$setBackgroundColor`(((BACKGROUND_ALPHA * f).toInt() shl 24) or BACKGROUND_RGB)
     }
 
+    /**
+     * The dismount itself waits for the next tick: a display spawned this very tick (vanilla
+     * typist, no typing session) has not been anchored by the ride yet, and freezing it early
+     * would leave it at the rough spawn height instead of where the bubble actually renders.
+     */
+    override fun freeze(playerId: UUID) {
+        tracked[playerId]?.following = false
+    }
+
     override fun remove(playerId: UUID) {
         tracked.remove(playerId)?.entity?.discard()
     }
@@ -85,7 +102,10 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         tracked.clear()
     }
 
-    /** Per-tick watchdog: repairs dismounted/stranded displays (covers death, dimension change, other mods), sneak hiding, teleport-follow. */
+    /**
+     * Per-tick watchdog: detaches sent popups, repairs dismounted/stranded displays (covers death,
+     * dimension change, other mods), syncs the mount to the rider, sneak hiding, teleport-follow.
+     */
     fun tick() {
         if (tracked.isEmpty()) return
         val server = server ?: return
@@ -99,6 +119,11 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
                 continue
             }
 
+            if (!t.following) {
+                detach(t, player)
+                continue
+            }
+
             val broken = t.entity.isRemoved ||
                 t.entity.level() !== player.level() ||
                 (config.followMode == FollowMode.RIDE && t.entity.vehicle !== player)
@@ -106,6 +131,12 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
                 t.entity.discard()
                 t.entity = createFor(player, t.text) ?: continue // retry next tick
                 t.hidden = false
+                t.mountSyncTicks = MOUNT_SYNC_TICKS
+            }
+
+            if (t.mountSyncTicks > 0) {
+                t.mountSyncTicks--
+                if (t.entity.vehicle === player) syncMountToRider(player)
             }
 
             if (config.followMode == FollowMode.TELEPORT) {
@@ -163,6 +194,18 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         return entity
     }
 
+    /** Sent message: cut the display loose so it lingers where the player stood, fully visible. */
+    private fun detach(t: Tracked, player: ServerPlayer) {
+        t.mountSyncTicks = 0
+        if (t.hidden) {
+            t.hidden = false
+            (t.entity as DisplayInvoker).`coh$setViewRange`(config.viewRange)
+        }
+        if (t.entity.vehicle !== player) return
+        forceDismount(t.entity, player)
+        syncMountToRider(player)
+    }
+
     /**
      * Vanilla startRiding refuses players as vehicles (EntityType.PLAYER doesn't serialize),
      * so mount manually: the exact vanilla sequence minus its checks. No game event is fired
@@ -174,6 +217,23 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         return passenger.vehicle === vehicle
     }
 
+    /** Mirror of [forceMount]; writes the list directly so no ENTITY_DISMOUNT game event fires. */
+    private fun forceDismount(passenger: Display.TextDisplay, vehicle: ServerPlayer) {
+        (passenger as EntityAccessor).`coh$setVehicle`(null)
+        (vehicle as EntityAccessor).`coh$setPassengers`(
+            ImmutableList.copyOf(vehicle.passengers.filter { it !== passenger })
+        )
+    }
+
+    /**
+     * A player is never inside their own entity tracker, so vanilla never tells them what is
+     * riding them: without this the typist's own client keeps the bubble wherever it spawned
+     * while it correctly follows everyone else's view. Cheap enough to resend on every mount.
+     */
+    private fun syncMountToRider(player: ServerPlayer) {
+        player.connection.send(ClientboundSetPassengersPacket(player))
+    }
+
     private fun renderText(text: String): Component =
         if (text.isEmpty()) TYPING_INDICATOR else Component.literal(text)
 
@@ -182,6 +242,12 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
         /** Extra rise above the ride anchor point; per-version tuning knob. */
         const val HEAD_OFFSET_BASE = 0f
+
+        /**
+         * Mount packets are sent from the tick loop, which may run before the display's own spawn
+         * packet: a client that doesn't know the entity yet drops the mount, so send it twice.
+         */
+        private const val MOUNT_SYNC_TICKS = 2
 
         private const val BACKGROUND_ALPHA = 0xC8
         private const val BACKGROUND_RGB = 0x1E1E1E
