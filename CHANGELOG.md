@@ -1,2 +1,2 @@
-- The bubble now follows you on your own screen while typing: moving, falling or getting pushed used to leave it floating where you started (other players always saw it follow)
-- Sent messages now stay where you sent them instead of trailing you around
+- Mod icon.
+- Releases now also publish to CurseForge.
