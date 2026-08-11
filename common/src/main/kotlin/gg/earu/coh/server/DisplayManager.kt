@@ -38,6 +38,7 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
     private var server: MinecraftServer? = null
     private val tracked = HashMap<UUID, Tracked>()
+    private var ticksSinceSweep = 0
 
     private val config get() = configProvider()
 
@@ -104,11 +105,13 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
     /**
      * Per-tick watchdog: detaches sent popups, repairs dismounted/stranded displays (covers death,
-     * dimension change, other mods), syncs the mount to the rider, sneak hiding, teleport-follow.
+     * dimension change, other mods), syncs the mount to the rider, sneak hiding, teleport-follow,
+     * and sweeps leftovers on a timer.
      */
     fun tick() {
-        if (tracked.isEmpty()) return
         val server = server ?: return
+        if (++ticksSinceSweep >= SWEEP_INTERVAL_TICKS) sweepOrphans(server)
+        if (tracked.isEmpty()) return
         val iterator = tracked.entries.iterator()
         while (iterator.hasNext()) {
             val (id, t) = iterator.next()
@@ -121,6 +124,13 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
 
             if (!t.following) {
                 detach(t, player)
+                // A sent popup keeps its spot, but only in the world its sender is still in: one
+                // stranded by a dimension change or a respawn elsewhere is dropped right away
+                // instead of hanging around a world nobody can tie it back to.
+                if (t.entity.isRemoved || t.entity.level() !== player.level()) {
+                    t.entity.discard()
+                    iterator.remove()
+                }
                 continue
             }
 
@@ -153,11 +163,20 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
         }
     }
 
-    /** Displays never legitimately persist; kill leftovers from crashes on startup. */
+    /**
+     * A display is never meant to outlive its message, so any tagged one we do not own is a
+     * leftover: worlds saved before displays stopped being written to disk still hold them, and a
+     * crash or another mod's copy can strand one at any time. Runs on startup and then on a timer,
+     * since a leftover only becomes reachable once its chunk loads.
+     */
     fun sweepOrphans(server: MinecraftServer) {
+        ticksSinceSweep = 0
+        val live = tracked.values.mapTo(HashSet(tracked.size)) { it.entity.id }
         var count = 0
         for (level in server.allLevels) {
-            val orphans = level.getEntities(EntityType.TEXT_DISPLAY) { it.tags.contains(ORPHAN_TAG) }
+            val orphans = level.getEntities(EntityType.TEXT_DISPLAY) {
+                it.tags.contains(ORPHAN_TAG) && it.id !in live
+            }
             orphans.forEach { it.discard() }
             count += orphans.size
         }
@@ -248,6 +267,9 @@ class DisplayManager(private val configProvider: () -> ServerConfig) : DisplaySi
          * packet: a client that doesn't know the entity yet drops the mount, so send it twice.
          */
         private const val MOUNT_SYNC_TICKS = 2
+
+        /** Orphan sweep cadence; a leftover is only visible for this long at worst. */
+        private const val SWEEP_INTERVAL_TICKS = 100
 
         private const val BACKGROUND_ALPHA = 0xC8
         private const val BACKGROUND_RGB = 0x1E1E1E
