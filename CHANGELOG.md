@@ -1,2 +1,2 @@
-- Mod icon.
-- Releases now also publish to CurseForge.
+- Chat bubbles left behind when a player switches dimensions, dies or disconnects are now cleared instead of lingering forever.
+- Leftovers already saved in existing worlds are swept a few seconds after their chunk loads.
