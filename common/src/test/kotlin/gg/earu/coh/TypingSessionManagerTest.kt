@@ -1,5 +1,6 @@
 package gg.earu.coh
 
+import gg.earu.coh.api.ChatState
 import gg.earu.coh.core.DisplaySink
 import gg.earu.coh.core.ServerConfig
 import gg.earu.coh.core.TypingSessionManager
@@ -21,10 +22,14 @@ class FakeSink : DisplaySink {
 class TypingSessionManagerTest {
     private val id = UUID.randomUUID()
 
+    private val changes = mutableListOf<Pair<ChatState, ChatState>>()
+
     private fun manager(config: ServerConfig = ServerConfig()): Pair<TypingSessionManager, FakeSink> {
         val sink = FakeSink()
-        return TypingSessionManager({ config }, sink) to sink
+        return TypingSessionManager({ config }, sink, { _, previous, current -> changes += previous to current }) to sink
     }
+
+    private fun transitions() = changes.filter { (previous, current) -> previous != current }
 
     @Test
     fun `start spawns typing indicator`() {
@@ -152,5 +157,84 @@ class TypingSessionManagerTest {
         m.onChat(id, "-- hide whisper", 10)
         assertEquals("remove", sink.last())
         assertTrue(m.activeIds.isEmpty())
+    }
+
+    @Test
+    fun `typing then sending reports IDLE to TYPING to POPUP`() {
+        val (m, _) = manager()
+        m.onStart(id, 0)
+        m.onText(id, "hi", 5)
+        m.onChat(id, "hi", 10)
+        assertEquals(listOf(ChatState.IDLE to ChatState.TYPING, ChatState.TYPING to ChatState.POPUP), transitions())
+    }
+
+    @Test
+    fun `starting a message while a popup is up reports POPUP to TYPING`() {
+        val (m, _) = manager()
+        m.onChat(id, "one", 0)
+        changes.clear()
+        m.onStart(id, 10)
+        assertEquals(listOf(ChatState.POPUP to ChatState.TYPING), transitions())
+    }
+
+    @Test
+    fun `a second message while a popup is up refreshes without a transition`() {
+        val (m, _) = manager()
+        m.onChat(id, "one", 0)
+        changes.clear()
+        m.onChat(id, "two", 40)
+        assertEquals(listOf(ChatState.POPUP to ChatState.POPUP), changes)
+    }
+
+    @Test
+    fun `vanilla chat reports IDLE to POPUP`() {
+        val (m, _) = manager()
+        m.onChat(id, "gg", 0)
+        assertEquals(listOf(ChatState.IDLE to ChatState.POPUP), transitions())
+    }
+
+    @Test
+    fun `every end path reports a change to IDLE`() {
+        val (m, _) = manager()
+
+        m.onStart(id, 0)
+        m.onEnd(id, 1)
+        m.onStart(id, 10)
+        m.onTick(311) // idle timeout
+        m.onChat(id, "gg", 400)
+        m.onTick(520) // popup expiry
+        m.onStart(id, 600)
+        m.onPlayerGone(id)
+        m.onStart(id, 700)
+        m.onChat(id, "-- hide whisper", 701)
+        m.onStart(id, 800)
+        m.onChat(id, "/tp secret", 801)
+        m.onStart(id, 900)
+        m.clearAll()
+
+        val ends = transitions().filter { (_, current) -> current == ChatState.IDLE }
+        assertEquals(
+            listOf(ChatState.TYPING, ChatState.TYPING, ChatState.POPUP, ChatState.TYPING, ChatState.TYPING, ChatState.TYPING, ChatState.TYPING),
+            ends.map { it.first },
+        )
+        assertTrue(m.activeIds.isEmpty())
+    }
+
+    @Test
+    fun `late end and end without a session report nothing`() {
+        val (m, _) = manager()
+        m.onEnd(id, 0)
+        m.onChat(id, "hi", 10)
+        m.onEnd(id, 11)
+        assertEquals(listOf(ChatState.IDLE to ChatState.POPUP), transitions())
+    }
+
+    @Test
+    fun `hidden typing still counts as typing`() {
+        val (m, _) = manager(ServerConfig(showTypingIndicator = false))
+        m.onStart(id, 0)
+        m.onText(id, "-- hide secret", 5)
+        assertEquals(listOf(ChatState.IDLE to ChatState.TYPING), transitions())
+        assertTrue(id in m.activeIds)
     }
 }

@@ -1,2 +1,1 @@
-- Chat bubbles left behind when a player switches dimensions, dies or disconnects are now cleared instead of lingering forever.
-- Leftovers already saved in existing worlds are swept a few seconds after their chunk loads.
+- Public API for other mods: `gg.earu.coh.api.ChatOverHead` reports who is typing and whose message is still popped up, keyed by UUID, with listeners for every transition. Fabric mirrors them on `CohEvents.STATE_CHANGE`, NeoForge posts `ChatStateChangedEvent`.

@@ -1,5 +1,6 @@
 package gg.earu.coh.core
 
+import gg.earu.coh.api.ChatState
 import java.util.UUID
 
 /** Receives display commands from the session manager. Implemented by DisplayManager in game, by fakes in tests. */
@@ -26,8 +27,10 @@ interface DisplaySink {
 class TypingSessionManager(
     private val configProvider: () -> ServerConfig,
     private val sink: DisplaySink,
+    /** Called after every state set, once it is observable. A popup refresh reports POPUP to POPUP. */
+    private val onStateChange: (id: UUID, previous: ChatState, current: ChatState) -> Unit = { _, _, _ -> },
 ) {
-    enum class Phase { TYPING, POPUP }
+    enum class Phase(val state: ChatState) { TYPING(ChatState.TYPING), POPUP(ChatState.POPUP) }
 
     private class Session(var phase: Phase, var lastActivityTick: Long) {
         var text: String = ""
@@ -47,10 +50,11 @@ class TypingSessionManager(
 
     fun onStart(id: UUID, nowTick: Long) {
         if (!config.enabled) return
-        endInternal(id)
+        val previous = discard(id)
         val session = Session(Phase.TYPING, nowTick)
         sessions[id] = session
         render(id, session)
+        onStateChange(id, previous, ChatState.TYPING)
     }
 
     fun onText(id: UUID, raw: String, nowTick: Long) {
@@ -95,6 +99,7 @@ class TypingSessionManager(
             endInternal(id)
             return
         }
+        val previous = sessions[id]?.phase?.state ?: ChatState.IDLE
         val session = sessions.getOrPut(id) { Session(Phase.POPUP, nowTick) }
         // A popup left over from the previous message sits wherever that one was sent; the new
         // message belongs above the player, so start over rather than retexting a stale display.
@@ -108,6 +113,7 @@ class TypingSessionManager(
         session.lastActivityTick = nowTick
         render(id, session)
         sink.freeze(id)
+        onStateChange(id, previous, ChatState.POPUP)
     }
 
     fun onTick(nowTick: Long) {
@@ -129,6 +135,7 @@ class TypingSessionManager(
                         if (session.displayed) sink.remove(id)
                         limiter.forget(id)
                         iterator.remove()
+                        onStateChange(id, ChatState.TYPING, ChatState.IDLE)
                     }
                 }
 
@@ -138,6 +145,7 @@ class TypingSessionManager(
                         if (session.displayed) sink.remove(id)
                         limiter.forget(id)
                         iterator.remove()
+                        onStateChange(id, ChatState.POPUP, ChatState.IDLE)
                     } else if (session.displayed && age >= popupTicks - fadeTicks) {
                         sink.fade(id, (age - (popupTicks - fadeTicks)).toFloat() / fadeTicks)
                     }
@@ -151,17 +159,25 @@ class TypingSessionManager(
     }
 
     fun clearAll() {
+        val ended = sessions.entries.map { (id, session) -> id to session.phase.state }
         for ((id, session) in sessions) {
             if (session.displayed) sink.remove(id)
             limiter.forget(id)
         }
         sessions.clear()
+        for ((id, previous) in ended) onStateChange(id, previous, ChatState.IDLE)
     }
 
     private fun endInternal(id: UUID) {
-        val session = sessions.remove(id) ?: return
+        onStateChange(id, discard(id), ChatState.IDLE)
+    }
+
+    /** Drops the session and its display without reporting; returns the state it was in. */
+    private fun discard(id: UUID): ChatState {
+        val session = sessions.remove(id) ?: return ChatState.IDLE
         if (session.displayed) sink.remove(id)
         limiter.forget(id)
+        return session.phase.state
     }
 
     private fun render(id: UUID, session: Session) {
