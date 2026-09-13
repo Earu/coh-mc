@@ -1,6 +1,8 @@
 package gg.earu.coh.neoforge
 
 import gg.earu.coh.Coh
+import gg.earu.coh.api.ChatOverHead
+import gg.earu.coh.api.ChatStateChangedEvent
 import gg.earu.coh.net.CohPayloads
 import gg.earu.coh.server.CohServer
 import net.minecraft.server.level.ServerPlayer
@@ -27,6 +29,7 @@ class CohNeoForge(container: ModContainer, modBus: IEventBus) {
 
         modBus.register(ModBusEvents)
         NeoForge.EVENT_BUS.register(ServerEvents)
+        ChatOverHead.addListener { change -> NeoForge.EVENT_BUS.post(ChatStateChangedEvent(change)) }
         if (FMLEnvironment.getDist().isClient) {
             ClientEvents.wire()
             NeoForge.EVENT_BUS.register(ClientEvents)
