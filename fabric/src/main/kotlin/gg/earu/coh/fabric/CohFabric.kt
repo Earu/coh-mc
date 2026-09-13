@@ -1,6 +1,8 @@
 package gg.earu.coh.fabric
 
 import gg.earu.coh.Coh
+import gg.earu.coh.api.ChatOverHead
+import gg.earu.coh.api.CohEvents
 import gg.earu.coh.net.CohPayloads
 import gg.earu.coh.platform.Platform
 import gg.earu.coh.server.CohServer
@@ -44,8 +46,11 @@ class CohFabric : ModInitializer {
         }
 
         ServerTickEvents.END_SERVER_TICK.register { CohServer.onTick() }
-        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ -> CohServer.onPlayerLeave(handler.player) }
+        // Fires on the Netty thread; the session map is server-thread only.
+        ServerPlayConnectionEvents.DISCONNECT.register { handler, server -> server.execute { CohServer.onPlayerLeave(handler.player) } }
         ServerLifecycleEvents.SERVER_STARTED.register { CohServer.onServerStarted(it) }
         ServerLifecycleEvents.SERVER_STOPPING.register { CohServer.onServerStopping(it) }
+
+        ChatOverHead.addListener { change -> CohEvents.STATE_CHANGE.invoker().onChatStateChange(change) }
     }
 }

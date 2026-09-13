@@ -1,5 +1,6 @@
 package gg.earu.coh.server
 
+import gg.earu.coh.api.ChatOverHead
 import gg.earu.coh.core.CohConfig
 import gg.earu.coh.core.ServerConfig
 import gg.earu.coh.core.TypingSessionManager
@@ -20,7 +21,7 @@ object CohServer {
     fun init(platform: Platform) {
         config = CohConfig.loadServer(platform.configDir)
         displays = DisplayManager { config }
-        sessions = TypingSessionManager({ config }, displays)
+        sessions = TypingSessionManager({ config }, displays, ChatOverHead::record)
     }
 
     fun onServerStarted(server: MinecraftServer) {

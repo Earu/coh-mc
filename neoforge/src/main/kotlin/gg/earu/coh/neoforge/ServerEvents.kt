@@ -12,7 +12,10 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 object ServerEvents {
     @SubscribeEvent
     fun onServerChat(event: ServerChatEvent) {
-        CohServer.onChat(event.player, event.rawText)
+        // Forge 47 fires this from the chat decorator on a worker thread; the session map is server-thread only.
+        val player = event.player
+        val text = event.rawText
+        player.server.execute { CohServer.onChat(player, text) }
     }
 
     @SubscribeEvent

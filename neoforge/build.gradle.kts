@@ -37,6 +37,17 @@ legacyForge {
     }
 }
 
+// Forge 47 finds mixin configs through a run argument in dev and the jar manifest in production.
+mixin {
+    config("coh.mixins.json")
+}
+
+tasks.jar {
+    manifest {
+        attributes("MixinConfigs" to "coh.mixins.json")
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     compilerOptions {

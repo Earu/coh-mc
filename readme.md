@@ -41,3 +41,18 @@ signing involved). Opt-outs:
 | `showTypingIndicator`| `true`  | Show a "…" bubble while chat is open but empty |
 | `followMode`         | `RIDE`  | `RIDE` (passenger) or `TELEPORT` (fallback)    |
 | `headOffsetY`        | `0.9`   | Bubble height above the head                   |
+
+## API
+
+Add the jar to your compile classpath and use `gg.earu.coh.api.ChatOverHead`. Server side only, keyed by UUID.
+
+```kotlin
+ChatOverHead.stateOf(uuid)          // ChatState: IDLE, TYPING or POPUP
+ChatOverHead.millisInStateOf(uuid)  // wall-clock time in that state, 0 when IDLE
+ChatOverHead.activePlayers()        // Map<UUID, ChatState> of everyone not IDLE, a snapshot
+ChatOverHead.addListener { change -> change.playerId; change.previous; change.current; change.previousMs }
+```
+
+TYPING means the chat box is open, POPUP means a sent message is still showing. The two never overlap. Typing with a hide prefix still counts as TYPING; `showTypingIndicator` only affects rendering. The text being typed is never exposed.
+
+Listeners fire on the server thread, only when the state changes. A second message while a popup is up refreshes the popup without an event and restarts its clock. Every way out of a state is reported: idle timeout, popup expiry, a message sent with a hide prefix or as a command, the player leaving, the server stopping. Before the server starts or with COH disabled everyone is IDLE. The same changes go through the loader's own pipeline: `CohEvents.STATE_CHANGE` on Fabric, `ChatStateChangedEvent` on the Forge game bus.
